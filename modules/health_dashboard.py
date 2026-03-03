@@ -5,14 +5,14 @@ import plotly.express as px
 
 def get_status(value, warn_low, crit_low, warn_high=None, crit_high=None):
     if value <= crit_low:
-        return "critical", "🔴 CRITICAL"
+        return "critical", "CRITICAL"
     elif crit_high and value >= crit_high:
-        return "critical", "🔴 CRITICAL"
+        return "critical", "CRITICAL"
     elif value <= warn_low:
-        return "warning", "🟡 WARNING"
+        return "warning", "WARNING"
     elif warn_high and value >= warn_high:
-        return "warning", "🟡 WARNING"
-    return "nominal", "🟢 NOMINAL"
+        return "warning", "WARNING"
+    return "nominal", "NOMINAL"
 
 
 def render():
@@ -45,29 +45,46 @@ def render():
 
     latest = df.iloc[0]
 
-    battery_class, battery_label = get_status(latest["battery_voltage"], 7.2, 6.8)
-    solar_class, solar_label = get_status(latest["solar_current"], 1.2, 0.9)
-    temp_class, temp_label = get_status(latest["temperature_obc"], 0, -5, 40, 50)
-    signal_class, signal_label = get_status(latest["signal_strength"], -90, -100)
-    attitude_class, attitude_label = get_status(latest["attitude_error"], -1, -1, 0.3, 0.7)
+    batt_v_class, _ = get_status(latest["eps_batt_voltage_v"], 7.2, 6.8)
+    batt_t_class, _ = get_status(latest["eps_batt_temp_c"], 0, -5, 30, 40)
+    solar_v_class, _ = get_status(latest["eps_solar_voltage_v"], 4.5, 4.0)
+    solar_i_class, _ = get_status(latest["eps_solar_current_ma"], 1200, 900)
+    obc_temp_class, _ = get_status(latest["obc_temp_c"], 0, -5, 40, 50)
+    adcs_class, _ = get_status(latest["adcs_attitude_error_deg"], -1, -1, 0.3, 0.7)
+    rssi_class, _ = get_status(latest["comms_rssi_dbm"], -90, -100)
 
     st.subheader("Spacecraft Status")
-    st.metric("Mission Mode", latest["mode"])
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Mission Mode", latest["mode"])
+    c2.metric("ADCS Mode", latest["adcs_mode"])
+    c3.metric("Uptime", f"{latest['obc_uptime_s']} s")
 
     st.markdown(f"""
-    <p>Power: <span class="{battery_class}">{battery_label}</span> &nbsp;&nbsp;|&nbsp;&nbsp; Thermal: <span class="{temp_class}">{temp_label}</span></p>
+    <p>Power: <span class="{batt_v_class}">{batt_v_class.upper()}</span> &nbsp;&nbsp;|&nbsp;&nbsp; Thermal: <span class="{obc_temp_class}">{obc_temp_class.upper()}</span></p>
     """, unsafe_allow_html=True)
 
-    st.subheader("Latest Reading")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.markdown(f'<p class="metric-{battery_class}">Battery<br><span style="font-size:1.8rem; font-weight:600;">{latest["battery_voltage"]:.2f} V</span></p>', unsafe_allow_html=True)
-    col2.markdown(f'<p class="metric-{solar_class}">Solar<br><span style="font-size:1.8rem; font-weight:600;">{latest["solar_current"]:.2f} A</span></p>', unsafe_allow_html=True)
-    col3.markdown(f'<p class="metric-{temp_class}">OBC Temp<br><span style="font-size:1.8rem; font-weight:600;">{latest["temperature_obc"]:.1f} °C</span></p>', unsafe_allow_html=True)
-    col4.markdown(f'<p class="metric-{signal_class}">Signal<br><span style="font-size:1.8rem; font-weight:600;">{latest["signal_strength"]:.1f} dB</span></p>', unsafe_allow_html=True)
-    col5.markdown(f'<p class="metric-{attitude_class}">Attitude<br><span style="font-size:1.8rem; font-weight:600;">{latest["attitude_error"]:.2f} °</span></p>', unsafe_allow_html=True)
+    st.markdown("---")
+
+    st.caption("Power")
+    p1, p2, p3, p4 = st.columns(4)
+    p1.markdown(f'<p class="metric-{batt_v_class}">Batt Voltage<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_batt_voltage_v"]:.2f} V</span></p>', unsafe_allow_html=True)
+    p2.markdown(f'<p class="metric-{batt_t_class}">Batt Temp<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_batt_temp_c"]:.1f} C</span></p>', unsafe_allow_html=True)
+    p3.markdown(f'<p class="metric-{solar_v_class}">Solar Voltage<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_solar_voltage_v"]:.2f} V</span></p>', unsafe_allow_html=True)
+    p4.markdown(f'<p class="metric-{solar_i_class}">Solar Current<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_solar_current_ma"]:.0f} mA</span></p>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    st.caption("Systems")
+    s1, s2, s3 = st.columns(3)
+    s1.markdown(f'<p class="metric-{obc_temp_class}">OBC Temp<br><span style="font-size:1.8rem; font-weight:600;">{latest["obc_temp_c"]:.1f} C</span></p>', unsafe_allow_html=True)
+    s2.markdown(f'<p class="metric-{adcs_class}">Attitude Error<br><span style="font-size:1.8rem; font-weight:600;">{latest["adcs_attitude_error_deg"]:.2f} deg</span></p>', unsafe_allow_html=True)
+    s3.markdown(f'<p class="metric-{rssi_class}">Signal (RSSI)<br><span style="font-size:1.8rem; font-weight:600;">{latest["comms_rssi_dbm"]:.1f} dBm</span></p>', unsafe_allow_html=True)
+
+    st.markdown("---")
 
     st.subheader("Battery Voltage Over Time")
-    fig = px.line(df.sort_values("timestamp"), x="timestamp", y="battery_voltage")
+    fig = px.line(df.sort_values("timestamp"), x="timestamp", y="eps_batt_voltage_v")
     st.plotly_chart(fig)
 
     st.subheader("Telemetry Log")
