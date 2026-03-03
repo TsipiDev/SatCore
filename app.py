@@ -67,5 +67,11 @@ col3.markdown(f'<p class="metric-{temp_class}">OBC Temp<br><span style="font-siz
 col4.markdown(f'<p class="metric-{signal_class}">Signal<br><span style="font-size:1.8rem; font-weight:600;">{latest["signal_strength"]:.1f} dB</span></p>', unsafe_allow_html=True)
 col5.markdown(f'<p class="metric-{attitude_class}">Attitude<br><span style="font-size:1.8rem; font-weight:600;">{latest["attitude_error"]:.2f} °</span></p>', unsafe_allow_html=True)
 
+import plotly.express as px
+
+st.subheader("Battery Voltage Over Time")
+fig = px.line(df, x="timestamp", y="battery_voltage")
+st.plotly_chart(fig)
+
 st.subheader("Telemetry Log")
 st.dataframe(df)
