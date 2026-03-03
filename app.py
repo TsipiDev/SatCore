@@ -29,7 +29,7 @@ st.markdown("""
 
 df = pd.read_csv("data/telemetry/sample_telemetry.csv")
 df["timestamp"] = pd.to_datetime(df["timestamp"])
-df = df.sort_values("timestamp")
+df = df.sort_values("timestamp", ascending=False)
 
 latest = df.iloc[-1]
 
@@ -74,4 +74,4 @@ fig = px.line(df, x="timestamp", y="battery_voltage")
 st.plotly_chart(fig)
 
 st.subheader("Telemetry Log")
-st.dataframe(df)
+st.dataframe(df, hide_index=True)
