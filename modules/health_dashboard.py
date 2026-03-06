@@ -43,6 +43,8 @@ def render():
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df = df.sort_values("timestamp", ascending=False)
 
+    df["eps_solar_current_a"] = df["eps_solar_current_ma"] / 1000
+
     latest = df.iloc[0]
 
     batt_v_class, _ = get_status(latest["eps_batt_voltage_v"], 7.2, 6.8)
@@ -83,8 +85,6 @@ def render():
 
     st.markdown("---")
 
-    df["eps_solar_current_a"] = df["eps_solar_current_ma"] / 1000
-
     st.subheader("Telemetry Charts")
 
     st.markdown("<h4 style='text-align: center;'>Power</h4>", unsafe_allow_html=True)
@@ -102,6 +102,15 @@ def render():
     st.markdown("<h4 style='text-align: center;'>Signal Strength</h4>", unsafe_allow_html=True)
     rssi_fig = px.line(df.sort_values("timestamp"), x="timestamp", y="comms_rssi_dbm")
     st.plotly_chart(rssi_fig, width='stretch')
+
+    st.subheader("Anomaly Log")
+
+    anomalies = df[df["mode"].isin(["WARNING", "CRITICAL"])]
+
+    if len(anomalies) == 0:
+        st.write("No anomalies detected.")
+    else:
+        st.dataframe(anomalies, hide_index=True)
 
     st.subheader("Telemetry Log")
     st.dataframe(df, hide_index=True)
