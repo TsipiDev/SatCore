@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+# This script generates synthetic telemetry data for a satellite, simulating normal operation and some anomaly periods.
 start = datetime(2024, 1, 15, 0, 0, 0)
 rows = []
 
