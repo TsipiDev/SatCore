@@ -48,11 +48,26 @@ def render():
 
         duration = round((set_time - rise_time).total_seconds() / 60, 1)
 
+        peak_t = t[i+1]
+        difference = satellite - ground_station
+        topocentric = difference.at(peak_t)
+        alt, _, _ = topocentric.altaz()
+
+        
+        if alt.degrees >= 60:
+            quality = "Excellent"
+        elif alt.degrees >= 30:
+            quality = "Good"
+        else:
+            quality = "Marginal"
+
         pass_windows.append({
             "Rise": rise_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "Peak": peak_time.strftime("%H:%M:%S UTC"),
             "Set": set_time.strftime("%H:%M:%S UTC"),
-            "Duration (mins)": duration
+            "Duration (mins)": duration,
+            "Max Elevation (deg)": round(alt.degrees, 1),
+            "Quality": quality
         })
 
     df_passes = pd.DataFrame(pass_windows)
