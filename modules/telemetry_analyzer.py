@@ -138,7 +138,6 @@ def render():
             else:
                 st.write("Cause could not be determined from available data.")
 
-            st.markdown("---")
 
     st.markdown("---")
     st.write("Parameter Trend Forecast")
