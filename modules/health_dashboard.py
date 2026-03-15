@@ -44,6 +44,7 @@ def render():
     df = df.sort_values("timestamp", ascending=False)
 
     df["eps_solar_current_a"] = df["eps_solar_current_ma"] / 1000
+    df_plot = df.sort_values("timestamp").set_index("timestamp").resample("1h").mean(numeric_only=True).reset_index()
 
     latest = df.iloc[0]
 
@@ -87,21 +88,25 @@ def render():
 
     st.subheader("Telemetry Charts")
 
-    st.markdown("<h4 style='text-align: center;'>Power</h4>", unsafe_allow_html=True)
-    power_fig = px.line(df.sort_values("timestamp"), x="timestamp", y=["eps_batt_voltage_v", "eps_solar_current_a"])
-    st.plotly_chart(power_fig, width='stretch')
+    with st.expander("Power", expanded=True):
+        st.markdown("<h4 style='text-align: center;'>Power</h4>", unsafe_allow_html=True)
+        power_fig = px.line(df_plot, x="timestamp", y=["eps_batt_voltage_v", "eps_solar_current_a"])
+        st.plotly_chart(power_fig, width='stretch')
 
-    st.markdown("<h4 style='text-align: center;'>Thermal</h4>", unsafe_allow_html=True)
-    thermal_fig = px.line(df.sort_values("timestamp"), x="timestamp", y=["obc_temp_c", "eps_batt_temp_c"])
-    st.plotly_chart(thermal_fig, width='stretch')
+    with st.expander("Thermal", expanded=False):
+        st.markdown("<h4 style='text-align: center;'>Thermal</h4>", unsafe_allow_html=True)
+        thermal_fig = px.line(df_plot, x="timestamp", y=["obc_temp_c", "eps_batt_temp_c"])
+        st.plotly_chart(thermal_fig, width='stretch')
 
-    st.markdown("<h4 style='text-align: center;'>Attitude Error</h4>", unsafe_allow_html=True)
-    adcs_fig = px.line(df.sort_values("timestamp"), x="timestamp", y="adcs_attitude_error_deg")
-    st.plotly_chart(adcs_fig, width='stretch')
+    with st.expander("Attitude Error", expanded=False):
+        st.markdown("<h4 style='text-align: center;'>Attitude Error</h4>", unsafe_allow_html=True)
+        adcs_fig = px.line(df_plot, x="timestamp", y="adcs_attitude_error_deg")
+        st.plotly_chart(adcs_fig, width='stretch')
 
-    st.markdown("<h4 style='text-align: center;'>Signal Strength</h4>", unsafe_allow_html=True)
-    rssi_fig = px.line(df.sort_values("timestamp"), x="timestamp", y="comms_rssi_dbm")
-    st.plotly_chart(rssi_fig, width='stretch')
+    with st.expander("Signal Strength", expanded=False):
+        st.markdown("<h4 style='text-align: center;'>Signal Strength</h4>", unsafe_allow_html=True)
+        rssi_fig = px.line(df_plot, x="timestamp", y="comms_rssi_dbm")
+        st.plotly_chart(rssi_fig, width='stretch')
 
     st.subheader("Anomaly Log")
 
