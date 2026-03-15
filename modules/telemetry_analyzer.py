@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
+
 def render():
     st.markdown("""
     <style>
@@ -22,6 +23,75 @@ def render():
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df = df.sort_values("timestamp")
 
+    latest = df.iloc[-1]
+
+    anomalies = df[df["mode"] != "NOMINAL"].copy()
+    if len(anomalies) > 0:
+        anomalies["event"] = (anomalies["timestamp"].diff() > pd.Timedelta(minutes=5)).cumsum()
+        events = []
+        for event_id, group in anomalies.groupby("event"):
+            events.append({
+                "start": group["timestamp"].iloc[0],
+                "end": group["timestamp"].iloc[-1],
+                "duration_mins": round((group["timestamp"].iloc[-1] - group["timestamp"].iloc[0]).total_seconds() / 60),
+                "max_severity": group["mode"].max(),
+                "rows": len(group)
+            })
+        events_df = pd.DataFrame(events)
+        num_events = len(events_df)
+    else:
+        events_df = None
+        num_events = 0
+
+    warn_count = 0
+    crit_count = 0
+
+    if latest["eps_batt_voltage_v"] < 6.8:
+        crit_count += 1
+    elif latest["eps_batt_voltage_v"] < 7.2:
+        warn_count += 1
+
+    if latest["eps_batt_temp_c"] > 40:
+        crit_count += 1
+    elif latest["eps_batt_temp_c"] > 30:
+        warn_count += 1
+
+    if latest["obc_temp_c"] > 50:
+        crit_count += 1
+    elif latest["obc_temp_c"] > 40:
+        warn_count += 1
+
+    if latest["comms_rssi_dbm"] < -100:
+        crit_count += 1
+    elif latest["comms_rssi_dbm"] < -90:
+        warn_count += 1
+
+    if latest["adcs_attitude_error_deg"] > 0.7:
+        crit_count += 1
+    elif latest["adcs_attitude_error_deg"] > 0.3:
+        warn_count += 1
+
+    if crit_count > 0:
+        overall = "CRITICAL"
+        overall_class = "critical"
+    elif warn_count >= 2:
+        overall = "DEGRADED"
+        overall_class = "warning"
+    elif warn_count == 1:
+        overall = "WARNING"
+        overall_class = "warning"
+    else:
+        overall = "NOMINAL"
+        overall_class = "nominal"
+
+    st.write("Spacecraft Overview")
+    o1, o2, o3 = st.columns(3)
+    o1.markdown(f'<p>Overall Health<br><span class="{overall_class}" style="font-size:1.8rem;">{overall}</span></p>', unsafe_allow_html=True)
+    o2.metric("Anomaly Events", num_events)
+    o3.metric("Observation Period", "7 days")
+
+    st.markdown("---")
+
     total = len(df)
     mode_counts = df["mode"].value_counts()
 
@@ -38,25 +108,9 @@ def render():
     st.markdown("---")
     st.write("Anomaly Events")
 
-    anomalies = df[df["mode"] != "NOMINAL"].copy()
-
-    if len(anomalies) == 0:
+    if events_df is None:
         st.write("No anomalies detected.")
     else:
-        anomalies["event"] = (anomalies["timestamp"].diff() > pd.Timedelta(minutes=5)).cumsum()
-
-        events = []
-        for event_id, group in anomalies.groupby("event"):
-            events.append({
-                "start": group["timestamp"].iloc[0],
-                "end": group["timestamp"].iloc[-1],
-                "duration_mins": round((group["timestamp"].iloc[-1] - group["timestamp"].iloc[0]).total_seconds() / 60),
-                "max_severity": group["mode"].max(),
-                "rows": len(group)
-            })
-
-        events_df = pd.DataFrame(events)
-
         for i, row in events_df.iterrows():
             st.markdown(f"**Event {i+1}** — {row['start'].strftime('%Y-%m-%d %H:%M')} to {row['end'].strftime('%Y-%m-%d %H:%M')}")
             c1, c2, c3 = st.columns(3)
@@ -83,6 +137,8 @@ def render():
                 st.write(f"Possible cause: {', '.join(causes)}")
             else:
                 st.write("Cause could not be determined from available data.")
+
+            st.markdown("---")
 
     st.markdown("---")
     st.write("Parameter Trend Forecast")
