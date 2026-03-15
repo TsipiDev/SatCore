@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 from skyfield.api import load, EarthSatellite, wgs84
-from datetime import datetime, timezone
-
+from datetime import datetime
+import pandas as pd
 
 def render():
     st.subheader("Pass Scheduler")
@@ -22,11 +22,10 @@ def render():
     ground_station = wgs84.latlon(38.5731, 23.5880)
 
     t0 = ts.now()
-    t1 = ts.tt_jd(t0.tt + 1)
+    t1 = ts.tt_jd(t0.tt + 7)
 
     passes = []
 
-    difference = satellite - ground_station
     t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=10.0)
 
     for ti, event in zip(t, events):
@@ -37,4 +36,24 @@ def render():
             "name": lines[0].strip()
         })
 
-    st.write(passes)
+    pass_windows = []
+    for i in range(0, len(passes) - 2, 3):
+        rise = passes[i]
+        peak = passes[i+1]
+        set_ = passes[i+2]
+
+        rise_time = datetime.fromisoformat(rise["time"].replace("Z", "+00:00"))
+        peak_time = datetime.fromisoformat(peak["time"].replace("Z", "+00:00"))
+        set_time = datetime.fromisoformat(set_["time"].replace("Z", "+00:00"))
+
+        duration = round((set_time - rise_time).total_seconds() / 60, 1)
+
+        pass_windows.append({
+            "Rise": rise_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "Peak": peak_time.strftime("%H:%M:%S UTC"),
+            "Set": set_time.strftime("%H:%M:%S UTC"),
+            "Duration (mins)": duration
+        })
+
+    df_passes = pd.DataFrame(pass_windows)
+    st.dataframe(df_passes, hide_index=True)
