@@ -2,7 +2,7 @@ import streamlit as st
 from modules import health_dashboard
 from modules import telemetry_analyzer
 
-st.title("SatCore🛰️")
+st.title("SatCore")
 
 page = st.sidebar.radio("Navigation", ["Health Dashboard", "Telemetry Analyzer"])
 
