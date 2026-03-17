@@ -48,10 +48,13 @@ def render():
                 if col is not None:
                     normalized[param] = df[col]
                 else:
-                    normalized[param] = "Not Provided"
+                    if param in ["adcs_mode", "mode", "timestamp"]:
+                        normalized[param] = "Not Provided"
+                    else:
+                        normalized[param] = 0
 
             normalized.to_csv("data/telemetry/sample_telemetry.csv", index=False)
-            st.success("Data imported successfully! Redirecting to Health Dashboard...")
+            st.success("Data imported successfully!")
             st.session_state["page"] = "Health Dashboard"
             st.rerun()
     else:

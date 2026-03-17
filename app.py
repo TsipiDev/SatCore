@@ -5,6 +5,8 @@ from modules import pass_scheduler
 from modules import orbit_visualizer
 from modules import data_import
 
+if "page" not in st.session_state:
+    st.session_state["page"] = "Data Import"
 
 st.title("SatCore")
 
@@ -31,16 +33,16 @@ st.markdown("""
 .info-nominal { animation: glow 2s infinite; color: #00FFB2; font-weight: bold; }
 .info-warning { animation: glow 2s infinite; color: #FFD700; font-weight: bold; }
 .info-critical { animation: glow 2s infinite; color: #FF4444; font-weight: bold; }
+.unknown { color: #FFFFFF; font-weight: bold; }
+.metric-unknown { color: #FFFFFF; font-size: 1rem; }
+.info-unknown { color: #FFFFFF; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-if "page" not in st.session_state:
-    st.session_state["page"] = "Data Import"
-
 page = st.sidebar.radio(
     "Navigation",
-    ["Data Import","Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"],
-    index=["Data Import","Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"].index(st.session_state["page"])
+    ["Data Import", "Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"],
+    index=["Data Import", "Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"].index(st.session_state["page"])
 )
 
 st.session_state["page"] = page

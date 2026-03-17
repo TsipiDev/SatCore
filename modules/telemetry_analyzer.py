@@ -5,11 +5,11 @@ import plotly.graph_objects as go
 
 
 def render():
-    
+
     st.subheader("Telemetry Analyzer")
 
     df = pd.read_csv("data/telemetry/sample_telemetry.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.sort_values("timestamp")
 
     latest = df.iloc[-1]
@@ -60,7 +60,15 @@ def render():
     elif latest["adcs_attitude_error_deg"] > 0.3:
         warn_count += 1
 
-    if crit_count > 0:
+    unmapped_count = sum([
+        1 for col in ["eps_batt_voltage_v", "eps_batt_temp_c", "obc_temp_c", "comms_rssi_dbm", "adcs_attitude_error_deg"]
+        if df[col].nunique() <= 1
+    ])
+
+    if unmapped_count >= 3:
+        overall = "INSUFFICIENT DATA"
+        overall_class = "info-unknown"
+    elif crit_count > 0:
         overall = "CRITICAL"
         overall_class = "critical"
     elif warn_count >= 2:
@@ -127,6 +135,7 @@ def render():
             else:
                 st.write("Cause could not be determined from available data.")
 
+            st.markdown("---")
 
     st.markdown("---")
     st.write("Parameter Trend Forecast")
@@ -138,92 +147,102 @@ def render():
     future_seconds = [df["timestamp_num"].max() + i * 86400 for i in range(future_days)]
     future_timestamps = [df["timestamp"].max() + pd.Timedelta(days=i) for i in range(future_days)]
 
-    # Battery Voltage
-    coeffs = np.polyfit(df["timestamp_num"], df["eps_batt_voltage_v"], 1)
-    slope_per_day = coeffs[0] * 86400
-    future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+    if df["eps_batt_voltage_v"].nunique() > 1:
+        coeffs = np.polyfit(df["timestamp_num"], df["eps_batt_voltage_v"], 1)
+        slope_per_day = coeffs[0] * 86400
+        future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+        with st.expander("Battery Voltage", expanded=True):
+            if slope_per_day < 0:
+                days_to_warn = (df["eps_batt_voltage_v"].iloc[-1] - 7.2) / abs(slope_per_day)
+                st.markdown(f'<span class="info-warning">Declining — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="info-nominal">Stable — trend: {slope_per_day:.4f} V/day</span>', unsafe_allow_html=True)
+            fig1 = go.Figure()
+            fig1.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["eps_batt_voltage_v"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
+            fig1.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
+            fig1.add_hline(y=7.2, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
+            fig1.update_layout(template="plotly_dark", title="Battery Voltage Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[6.5, 9.0]))
+            st.plotly_chart(fig1)
+    else:
+        with st.expander("Battery Voltage", expanded=True):
+            st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
 
-    with st.expander("Battery Voltage", expanded=True):
-        if slope_per_day < 0:
-            days_to_warn = (df["eps_batt_voltage_v"].iloc[-1] - 7.2) / abs(slope_per_day)
-            st.markdown(f'<span class="warning">Declining — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<span class="nominal">Stable — trend: {slope_per_day:.4f} V/day</span>', unsafe_allow_html=True)
-        fig1 = go.Figure()
-        fig1.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["eps_batt_voltage_v"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
-        fig1.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
-        fig1.add_hline(y=7.2, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
-        fig1.update_layout(template="plotly_dark", title="Battery Voltage Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[6.5, 9.0]))
-        st.plotly_chart(fig1)
+    if df["obc_temp_c"].nunique() > 1:
+        coeffs = np.polyfit(df["timestamp_num"], df["obc_temp_c"], 1)
+        slope_per_day = coeffs[0] * 86400
+        future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+        with st.expander("OBC Temperature", expanded=True):
+            if slope_per_day > 0:
+                days_to_warn = (40 - df["obc_temp_c"].iloc[-1]) / slope_per_day
+                st.markdown(f'<span class="info-warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="info-nominal">Stable — trend: {slope_per_day:.4f} C/day</span>', unsafe_allow_html=True)
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["obc_temp_c"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
+            fig2.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
+            fig2.add_hline(y=40, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
+            fig2.update_layout(template="plotly_dark", title="OBC Temperature Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[15, 55]))
+            st.plotly_chart(fig2)
+    else:
+        with st.expander("OBC Temperature", expanded=True):
+            st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
 
-    # OBC Temperature
-    coeffs = np.polyfit(df["timestamp_num"], df["obc_temp_c"], 1)
-    slope_per_day = coeffs[0] * 86400
-    future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+    if df["eps_batt_temp_c"].nunique() > 1:
+        coeffs = np.polyfit(df["timestamp_num"], df["eps_batt_temp_c"], 1)
+        slope_per_day = coeffs[0] * 86400
+        future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+        with st.expander("Battery Temperature", expanded=True):
+            if slope_per_day > 0:
+                days_to_warn = (30 - df["eps_batt_temp_c"].iloc[-1]) / slope_per_day
+                st.markdown(f'<span class="info-warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="info-nominal">Stable — trend: {slope_per_day:.4f} C/day</span>', unsafe_allow_html=True)
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["eps_batt_temp_c"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
+            fig3.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
+            fig3.add_hline(y=30, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
+            fig3.update_layout(template="plotly_dark", title="Battery Temperature Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[10, 45]))
+            st.plotly_chart(fig3)
+    else:
+        with st.expander("Battery Temperature", expanded=True):
+            st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
 
-    with st.expander("OBC Temperature", expanded=True):
-        if slope_per_day > 0:
-            days_to_warn = (40 - df["obc_temp_c"].iloc[-1]) / slope_per_day
-            st.markdown(f'<span class="warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<span class="nominal">Stable — trend: {slope_per_day:.4f} C/day</span>', unsafe_allow_html=True)
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["obc_temp_c"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
-        fig2.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
-        fig2.add_hline(y=40, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
-        fig2.update_layout(template="plotly_dark", title="OBC Temperature Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[15, 55]))
-        st.plotly_chart(fig2)
+    if df["comms_rssi_dbm"].nunique() > 1:
+        coeffs = np.polyfit(df["timestamp_num"], df["comms_rssi_dbm"], 1)
+        slope_per_day = coeffs[0] * 86400
+        future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+        with st.expander("Signal Strength", expanded=True):
+            if slope_per_day < 0:
+                days_to_warn = (df["comms_rssi_dbm"].iloc[-1] - (-90)) / abs(slope_per_day)
+                st.markdown(f'<span class="info-warning">Declining — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="info-nominal">Stable — trend: {slope_per_day:.4f} dBm/day</span>', unsafe_allow_html=True)
+            fig4 = go.Figure()
+            fig4.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["comms_rssi_dbm"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
+            fig4.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
+            fig4.add_hline(y=-90, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
+            fig4.update_layout(template="plotly_dark", title="Signal Strength Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[-100, -75]))
+            st.plotly_chart(fig4)
+    else:
+        with st.expander("Signal Strength", expanded=True):
+            st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
 
-    # Battery Temperature
-    coeffs = np.polyfit(df["timestamp_num"], df["eps_batt_temp_c"], 1)
-    slope_per_day = coeffs[0] * 86400
-    future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
-
-    with st.expander("Battery Temperature", expanded=True):
-        if slope_per_day > 0:
-            days_to_warn = (30 - df["eps_batt_temp_c"].iloc[-1]) / slope_per_day
-            st.markdown(f'<span class="warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<span class="nominal">Stable — trend: {slope_per_day:.4f} C/day</span>', unsafe_allow_html=True)
-        fig3 = go.Figure()
-        fig3.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["eps_batt_temp_c"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
-        fig3.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
-        fig3.add_hline(y=30, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
-        fig3.update_layout(template="plotly_dark", title="Battery Temperature Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[10, 45]))
-        st.plotly_chart(fig3)
-
-    # Signal Strength
-    coeffs = np.polyfit(df["timestamp_num"], df["comms_rssi_dbm"], 1)
-    slope_per_day = coeffs[0] * 86400
-    future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
-
-    with st.expander("Signal Strength", expanded=True):
-        if slope_per_day < 0:
-            days_to_warn = (df["comms_rssi_dbm"].iloc[-1] - (-90)) / abs(slope_per_day)
-            st.markdown(f'<span class="warning">Declining — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<span class="nominal">Stable — trend: {slope_per_day:.4f} dBm/day</span>', unsafe_allow_html=True)
-        fig4 = go.Figure()
-        fig4.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["comms_rssi_dbm"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
-        fig4.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
-        fig4.add_hline(y=-90, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
-        fig4.update_layout(template="plotly_dark", title="Signal Strength Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[-100, -75]))
-        st.plotly_chart(fig4)
-
-    # Attitude Error
-    coeffs = np.polyfit(df["timestamp_num"], df["adcs_attitude_error_deg"], 1)
-    slope_per_day = coeffs[0] * 86400
-    future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
-
-    with st.expander("Attitude Error", expanded=True):
-        if slope_per_day > 0:
-            days_to_warn = (0.3 - df["adcs_attitude_error_deg"].iloc[-1]) / slope_per_day
-            st.markdown(f'<span class="warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<span class="nominal">Stable — trend: {slope_per_day:.4f} deg/day</span>', unsafe_allow_html=True)
-        fig5 = go.Figure()
-        fig5.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["adcs_attitude_error_deg"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
-        fig5.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
-        fig5.add_hline(y=0.3, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
-        fig5.update_layout(template="plotly_dark", title="Attitude Error Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[0, 1.0]))
-        st.plotly_chart(fig5)
+    if df["adcs_attitude_error_deg"].nunique() > 1:
+        coeffs = np.polyfit(df["timestamp_num"], df["adcs_attitude_error_deg"], 1)
+        slope_per_day = coeffs[0] * 86400
+        future_values = [coeffs[1] + coeffs[0] * s for s in future_seconds]
+        with st.expander("Attitude Error", expanded=True):
+            if slope_per_day > 0:
+                days_to_warn = (0.3 - df["adcs_attitude_error_deg"].iloc[-1]) / slope_per_day
+                st.markdown(f'<span class="info-warning">Rising — WARNING estimated in {days_to_warn:.1f} days</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="info-nominal">Stable — trend: {slope_per_day:.4f} deg/day</span>', unsafe_allow_html=True)
+            fig5 = go.Figure()
+            fig5.add_trace(go.Scatter(x=df_plot["timestamp"], y=df_plot["adcs_attitude_error_deg"], name="Actual", mode="lines+markers", line=dict(color="#00FFB2")))
+            fig5.add_trace(go.Scatter(x=future_timestamps, y=future_values, name="Forecast", line=dict(color="#FFD700", dash="dash")))
+            fig5.add_hline(y=0.3, line_color="#FF4444", line_dash="dot", annotation_text="WARNING")
+            fig5.update_layout(template="plotly_dark", title="Attitude Error Forecast", height=300, margin=dict(t=40), yaxis=dict(range=[0, 1.0]))
+            st.plotly_chart(fig5)
+    else:
+        with st.expander("Attitude Error", expanded=True):
+            st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
