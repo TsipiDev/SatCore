@@ -4,6 +4,12 @@ import plotly.express as px
 
 
 def get_status(value, warn_low, crit_low, warn_high=None, crit_high=None):
+    try:
+        value = float(value)
+    except:
+        return "unknown", "NOT PROVIDED"
+    if value == 0:
+        return "unknown", "NOT PROVIDED"
     if value <= crit_low:
         return "critical", "CRITICAL"
     elif crit_high and value >= crit_high:
@@ -15,13 +21,27 @@ def get_status(value, warn_low, crit_low, warn_high=None, crit_high=None):
     return "nominal", "NOMINAL"
 
 
+def fmt(value, decimals=2, unit=""):
+    try:
+        v = float(value)
+        if v == 0:
+            return "N/A"
+        return f"{v:.{decimals}f} {unit}".strip()
+    except:
+        return "N/A"
+
+
 def render():
 
     df = pd.read_csv("data/telemetry/sample_telemetry.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.sort_values("timestamp", ascending=False)
 
-    df["eps_solar_current_a"] = df["eps_solar_current_ma"] / 1000
+    if df["eps_solar_current_ma"].dtype != object:
+        df["eps_solar_current_a"] = df["eps_solar_current_ma"] / 1000
+    else:
+        df["eps_solar_current_a"] = 0
+
     df_plot = df.sort_values("timestamp").set_index("timestamp").resample("1h").mean(numeric_only=True).reset_index()
 
     latest = df.iloc[0]
@@ -37,13 +57,15 @@ def render():
     st.subheader("Spacecraft Status")
 
     c1, c2, c3 = st.columns(3)
-    
-    mode_class = "nominal" if latest["mode"] == "NOMINAL" else "warning" if latest["mode"] == "WARNING" else "critical"
-    adcs_class = "nominal" if latest["adcs_mode"] == "NOMINAL" else "warning"
 
-    c1.markdown(f'<p>Mission Mode<br><span class="{mode_class}" style="font-size:1.8rem;">{latest["mode"]}</span></p>', unsafe_allow_html=True)
-    c2.markdown(f'<p>ADCS Mode<br><span class="{adcs_class}" style="font-size:1.8rem;">{latest["adcs_mode"]}</span></p>', unsafe_allow_html=True)
-    c3.metric("Uptime", f"{latest['obc_uptime_s']} s")
+    mode_val = str(latest["mode"])
+    adcs_val = str(latest["adcs_mode"])
+    mode_class = "unknown" if mode_val == "Not Provided" else ("nominal" if mode_val == "NOMINAL" else "warning" if mode_val == "WARNING" else "critical")
+    adcs_mode_class = "unknown" if adcs_val == "Not Provided" else ("nominal" if adcs_val == "NOMINAL" else "warning")
+
+    c1.markdown(f'<p>Mission Mode<br><span class="{mode_class}" style="font-size:1.8rem;">{mode_val}</span></p>', unsafe_allow_html=True)
+    c2.markdown(f'<p>ADCS Mode<br><span class="{adcs_mode_class}" style="font-size:1.8rem;">{adcs_val}</span></p>', unsafe_allow_html=True)
+    c3.metric("Uptime", fmt(latest["obc_uptime_s"], 0, "s"))
 
     st.markdown(f"""
     <p>Power: <span class="{batt_v_class}">{batt_v_class.upper()}</span> &nbsp;&nbsp;|&nbsp;&nbsp; Thermal: <span class="{obc_temp_class}">{obc_temp_class.upper()}</span></p>
@@ -53,18 +75,18 @@ def render():
 
     st.caption("Power")
     p1, p2, p3, p4 = st.columns(4)
-    p1.markdown(f'<p class="metric-{batt_v_class}">Batt Voltage<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_batt_voltage_v"]:.2f} V</span></p>', unsafe_allow_html=True)
-    p2.markdown(f'<p class="metric-{batt_t_class}">Batt Temp<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_batt_temp_c"]:.1f} C</span></p>', unsafe_allow_html=True)
-    p3.markdown(f'<p class="metric-{solar_v_class}">Solar Voltage<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_solar_voltage_v"]:.2f} V</span></p>', unsafe_allow_html=True)
-    p4.markdown(f'<p class="metric-{solar_i_class}">Solar Current<br><span style="font-size:1.8rem; font-weight:600;">{latest["eps_solar_current_ma"]:.0f} mA</span></p>', unsafe_allow_html=True)
+    p1.markdown(f'<p class="metric-{batt_v_class}">Batt Voltage<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["eps_batt_voltage_v"], 2, "V")}</span></p>', unsafe_allow_html=True)
+    p2.markdown(f'<p class="metric-{batt_t_class}">Batt Temp<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["eps_batt_temp_c"], 1, "C")}</span></p>', unsafe_allow_html=True)
+    p3.markdown(f'<p class="metric-{solar_v_class}">Solar Voltage<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["eps_solar_voltage_v"], 2, "V")}</span></p>', unsafe_allow_html=True)
+    p4.markdown(f'<p class="metric-{solar_i_class}">Solar Current<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["eps_solar_current_ma"], 0, "mA")}</span></p>', unsafe_allow_html=True)
 
     st.markdown("---")
 
     st.caption("Systems")
     s1, s2, s3 = st.columns(3)
-    s1.markdown(f'<p class="metric-{obc_temp_class}">OBC Temp<br><span style="font-size:1.8rem; font-weight:600;">{latest["obc_temp_c"]:.1f} C</span></p>', unsafe_allow_html=True)
-    s2.markdown(f'<p class="metric-{adcs_class}">Attitude Error<br><span style="font-size:1.8rem; font-weight:600;">{latest["adcs_attitude_error_deg"]:.2f} deg</span></p>', unsafe_allow_html=True)
-    s3.markdown(f'<p class="metric-{rssi_class}">Signal (RSSI)<br><span style="font-size:1.8rem; font-weight:600;">{latest["comms_rssi_dbm"]:.1f} dBm</span></p>', unsafe_allow_html=True)
+    s1.markdown(f'<p class="metric-{obc_temp_class}">OBC Temp<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["obc_temp_c"], 1, "C")}</span></p>', unsafe_allow_html=True)
+    s2.markdown(f'<p class="metric-{adcs_class}">Attitude Error<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["adcs_attitude_error_deg"], 2, "deg")}</span></p>', unsafe_allow_html=True)
+    s3.markdown(f'<p class="metric-{rssi_class}">Signal (RSSI)<br><span style="font-size:1.8rem; font-weight:600;">{fmt(latest["comms_rssi_dbm"], 1, "dBm")}</span></p>', unsafe_allow_html=True)
 
     st.markdown("---")
 
