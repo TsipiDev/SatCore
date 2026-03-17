@@ -16,28 +16,6 @@ def get_status(value, warn_low, crit_low, warn_high=None, crit_high=None):
 
 
 def render():
-    st.markdown("""
-    <style>
-    @keyframes glow {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-    @keyframes slow-flash {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.2; }
-    }
-    @keyframes fast-flash {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-    }
-    .nominal { animation: glow 2s infinite; color: #00FFB2; font-weight: bold; font-size: 1.1rem; }
-    .warning { animation: slow-flash 1.2s infinite; color: #FFD700; font-weight: bold; font-size: 1.1rem; }
-    .critical { animation: fast-flash 0.4s infinite; color: #FF4444; font-weight: bold; font-size: 1.1rem; }
-    .metric-nominal { animation: glow 2s infinite; color: #00FFB2; font-size: 1rem; }
-    .metric-warning { animation: slow-flash 1.2s infinite; color: #FFD700; font-size: 1rem; }
-    .metric-critical { animation: fast-flash 0.4s infinite; color: #FF4444; font-size: 1rem; }
-    </style>
-    """, unsafe_allow_html=True)
 
     df = pd.read_csv("data/telemetry/sample_telemetry.csv")
     df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -59,8 +37,12 @@ def render():
     st.subheader("Spacecraft Status")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Mission Mode", latest["mode"])
-    c2.metric("ADCS Mode", latest["adcs_mode"])
+    
+    mode_class = "nominal" if latest["mode"] == "NOMINAL" else "warning" if latest["mode"] == "WARNING" else "critical"
+    adcs_class = "nominal" if latest["adcs_mode"] == "NOMINAL" else "warning"
+
+    c1.markdown(f'<p>Mission Mode<br><span class="{mode_class}" style="font-size:1.8rem;">{latest["mode"]}</span></p>', unsafe_allow_html=True)
+    c2.markdown(f'<p>ADCS Mode<br><span class="{adcs_class}" style="font-size:1.8rem;">{latest["adcs_mode"]}</span></p>', unsafe_allow_html=True)
     c3.metric("Uptime", f"{latest['obc_uptime_s']} s")
 
     st.markdown(f"""
