@@ -149,7 +149,8 @@ def render():
     st.write("Next Pass")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("AOS", next_pass["AOS"].split(" ")[1])
-    c2.metric("Quality", next_pass["Quality"])
+    quality_class = "info-nominal" if next_pass["Quality"] == "Excellent" else "info-warning" if next_pass["Quality"] == "Good" else "info-critical"
+    c2.markdown(f'<p>Quality<br><span class="{quality_class}" style="font-size:1.8rem;">{next_pass["Quality"]}</span></p>', unsafe_allow_html=True)
     c3.metric("Max Elevation", f"{next_pass['Max Elevation (deg)']} deg")
     c4.metric("Time Until Pass", f"{hours}h {mins}m")
 

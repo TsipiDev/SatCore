@@ -5,18 +5,7 @@ import plotly.graph_objects as go
 
 
 def render():
-    st.markdown("""
-    <style>
-    @keyframes glow {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-    .nominal { animation: glow 2s infinite; color: #00FFB2; font-weight: bold; }
-    .warning { animation: glow 2s infinite; color: #FFD700; font-weight: bold; }
-    .critical { animation: glow 2s infinite; color: #FF4444; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-
+    
     st.subheader("Telemetry Analyzer")
 
     df = pd.read_csv("data/telemetry/sample_telemetry.csv")
@@ -101,9 +90,9 @@ def render():
 
     st.write("Mission Health Summary")
     c1, c2, c3 = st.columns(3)
-    c1.markdown(f'<p>Nominal<br><span class="nominal" style="font-size:1.8rem;">{nominal_pct}%</span></p>', unsafe_allow_html=True)
-    c2.markdown(f'<p>Warning<br><span class="warning" style="font-size:1.8rem;">{warning_pct}%</span></p>', unsafe_allow_html=True)
-    c3.markdown(f'<p>Critical<br><span class="critical" style="font-size:1.8rem;">{critical_pct}%</span></p>', unsafe_allow_html=True)
+    c1.markdown(f'<p>Nominal<br><span class="info-nominal" style="font-size:1.8rem;">{nominal_pct}%</span></p>', unsafe_allow_html=True)
+    c2.markdown(f'<p>Warning<br><span class="info-warning" style="font-size:1.8rem;">{warning_pct}%</span></p>', unsafe_allow_html=True)
+    c3.markdown(f'<p>Critical<br><span class="info-critical" style="font-size:1.8rem;">{critical_pct}%</span></p>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("Anomaly Events")
