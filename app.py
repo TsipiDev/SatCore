@@ -3,6 +3,7 @@ from modules import health_dashboard
 from modules import telemetry_analyzer
 from modules import pass_scheduler
 from modules import orbit_visualizer
+from modules import data_import
 
 
 st.title("SatCore")
@@ -33,9 +34,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-page = st.sidebar.radio("Navigation", ["Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"])
+if "page" not in st.session_state:
+    st.session_state["page"] = "Data Import"
 
-if page == "Health Dashboard":
+page = st.sidebar.radio(
+    "Navigation",
+    ["Data Import","Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"],
+    index=["Data Import","Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"].index(st.session_state["page"])
+)
+
+st.session_state["page"] = page
+
+if page == "Data Import":
+    data_import.render()
+elif page == "Health Dashboard":
     health_dashboard.render()
 elif page == "Telemetry Analyzer":
     telemetry_analyzer.render()
