@@ -3,18 +3,23 @@ import pandas as pd
 
 
 def render():
-    st.subheader("Data Import")
 
+    st.markdown('<p class="page-title">Data Import</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">TELEMETRY CSV IMPORT & PARAMETER MAPPING</p>', unsafe_allow_html=True)
+
+    st.markdown('<div class="panel"><p class="panel-title">UPLOAD</p>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload Telemetry CSV", type="csv")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
-        st.write("Preview:")
+
+        st.markdown('<div class="panel"><p class="panel-title">PREVIEW</p>', unsafe_allow_html=True)
         st.dataframe(df.head(), hide_index=True)
         st.write(f"Detected columns: {list(df.columns)}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown("---")
-        st.write("Map your columns to SatCore parameters")
+        st.markdown('<div class="panel"><p class="panel-title">PARAMETER MAPPING</p>', unsafe_allow_html=True)
         st.caption("Only map the parameters available in your CSV. Unmapped parameters will show as Not Provided.")
 
         satcore_params = [
@@ -39,8 +44,9 @@ def render():
             selected = st.selectbox(f"{param}", user_columns, index=0)
             mapping[param] = None if selected == "-- not mapped --" else selected
 
-        st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
 
+        st.markdown('<div class="panel"><p class="panel-title">IMPORT</p>', unsafe_allow_html=True)
         if st.button("Import Data"):
             normalized = pd.DataFrame()
 
@@ -54,8 +60,14 @@ def render():
                         normalized[param] = 0
 
             normalized.to_csv("data/telemetry/sample_telemetry.csv", index=False)
-            st.success("Data imported successfully!")
+            st.success("Data imported successfully! Navigate to Health Dashboard to view.")
             st.session_state["page"] = "Health Dashboard"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
     else:
-        st.info("Upload a CSV file to get started.")
+        st.markdown('<div class="panel"><p class="panel-title">INSTRUCTIONS</p>', unsafe_allow_html=True)
+        st.write("Upload a decoded telemetry CSV file to get started.")
+        st.write("Your CSV can use any column names — you will map them to SatCore parameters in the next step.")
+        st.write("Parameters that are not mapped will display as Not Provided across all modules.")
+        st.markdown('</div>', unsafe_allow_html=True)

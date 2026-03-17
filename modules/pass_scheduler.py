@@ -1,15 +1,17 @@
 import streamlit as st
 import requests
+import pytz
+import os
+import pandas as pd
 from skyfield.api import load, EarthSatellite, wgs84
 from datetime import datetime, timezone
-import pandas as pd
-import pytz
 import json
-import os
 
 
 def render():
-    st.subheader("Pass Scheduler")
+
+    st.markdown('<p class="page-title">Pass Scheduler</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">GROUND STATION PASS PREDICTION & SCHEDULING</p>', unsafe_allow_html=True)
 
     tz_options = {
         "UTC-12": "Etc/GMT+12",
@@ -41,57 +43,57 @@ def render():
         "UTC+14": "Etc/GMT-14"
     }
 
-    selected_tz = st.selectbox("Display Timezone", list(tz_options.keys()), index=14)
-    local_tz = pytz.timezone(tz_options[selected_tz])
+    st.markdown('<div class="panel"><p class="panel-title">CONFIGURATION</p>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
 
-    with open("data/ground_stations.json") as f:
-        ground_stations = json.load(f)
+    with col1:
+        with open("data/ground_stations.json") as f:
+            ground_stations = json.load(f)
+        gs_names = [gs["name"] for gs in ground_stations]
+        selected_gs_name = st.selectbox("Ground Station", gs_names, index=0)
+        selected_gs = next(gs for gs in ground_stations if gs["name"] == selected_gs_name)
 
-    gs_names = [gs["name"] for gs in ground_stations]
-    selected_gs_name = st.selectbox("Ground Station", gs_names, index=0)
-    selected_gs = next(gs for gs in ground_stations if gs["name"] == selected_gs_name)
-    ground_station = wgs84.latlon(selected_gs["lat"], selected_gs["lon"])
+    with col2:
+        if not os.path.exists("data/tle_data/active.tle"):
+            st.warning("TLE catalog not found. Please run fetch_tle_catalog.py first.")
+            return
+        with open("data/tle_data/active.tle") as f:
+            catalog_lines = f.read().strip().splitlines()
+        clean_lines = [line for line in catalog_lines if line.strip() != ""]
+        all_satellites = {}
+        for i in range(0, len(clean_lines) - 2, 3):
+            name = clean_lines[i].strip()
+            all_satellites[name] = clean_lines[i:i+3]
+        sat_names = list(all_satellites.keys())
+        selected_satellite = st.selectbox("Select Satellite", sat_names, index=sat_names.index("TIGER-7") if "TIGER-7" in sat_names else 0)
+        lines = all_satellites[selected_satellite]
 
-    if not os.path.exists("data/tle_data/active.tle"):
-        st.warning("TLE catalog not found. Please run fetch_tle_catalog.py first.")
-        return
+    with col3:
+        selected_tz = st.selectbox("Display Timezone", list(tz_options.keys()), index=14)
+        local_tz = pytz.timezone(tz_options[selected_tz])
 
-    with open("data/tle_data/active.tle") as f:
-        catalog_lines = f.read().strip().splitlines()
-
-    all_satellites = {}
-    clean_lines = [line for line in catalog_lines if line.strip() != ""]
-    for i in range(0, len(clean_lines) - 2, 3):
-        name = clean_lines[i].strip()
-        all_satellites[name] = clean_lines[i:i+3]
-
-    sat_names = list(all_satellites.keys())
-    selected_satellite = st.selectbox("Select Satellite", sat_names, index=sat_names.index("TIGER-7") if "TIGER-7" in sat_names else 0)
-    lines = all_satellites[selected_satellite]
+    st.markdown('</div>', unsafe_allow_html=True)
 
     ts = load.timescale()
     satellite = EarthSatellite(lines[1], lines[2], lines[0], ts)
+    ground_station = wgs84.latlon(selected_gs["lat"], selected_gs["lon"])
 
-    st.markdown("---")
-    st.write("Tracking Info")
+    st.markdown('<div class="panel"><p class="panel-title">TRACKING INFO</p>', unsafe_allow_html=True)
     st.metric("Satellite", lines[0].strip())
     st.metric("Ground Station", selected_gs["name"])
     st.metric("TLE Epoch", satellite.epoch.utc_iso().replace("T", " ").replace("Z", " UTC"))
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     t0 = ts.now()
     t1 = ts.tt_jd(t0.tt + 7)
-
-    t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=5.0)
-
+    t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=10.0)
 
     passes = []
     for ti, event in zip(t, events):
         event_name = ["rise", "peak", "set"][event]
         passes.append({
             "time": ti.utc_iso(),
-            "event": event_name,
-            "name": lines[0].strip()
+            "event": event_name
         })
 
     pass_windows = []
@@ -146,15 +148,16 @@ def render():
     hours = int(time_until.total_seconds() // 3600)
     mins = int((time_until.total_seconds() % 3600) // 60)
 
-    st.write("Next Pass")
+    st.markdown('<div class="panel"><p class="panel-title">NEXT PASS</p>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("AOS", next_pass["AOS"].split(" ")[1])
+    c2.metric("Duration", f"{next_pass['Duration (mins)']} mins")
     quality_class = "info-nominal" if next_pass["Quality"] == "Excellent" else "info-warning" if next_pass["Quality"] == "Good" else "info-critical"
-    c2.markdown(f'<p>Quality<br><span class="{quality_class}" style="font-size:1.8rem;">{next_pass["Quality"]}</span></p>', unsafe_allow_html=True)
-    c3.metric("Max Elevation", f"{next_pass['Max Elevation (deg)']} deg")
+    c3.markdown(f'<p>Quality<br><span class="{quality_class}" style="font-size:1.8rem;">{next_pass["Quality"]}</span></p>', unsafe_allow_html=True)
     c4.metric("Time Until Pass", f"{hours}h {mins}m")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.write("Upcoming Passes")
+    st.markdown('<div class="panel"><p class="panel-title">UPCOMING PASSES</p>', unsafe_allow_html=True)
     df_passes = pd.DataFrame(pass_windows)
     st.dataframe(df_passes, hide_index=True)
+    st.markdown('</div>', unsafe_allow_html=True)
