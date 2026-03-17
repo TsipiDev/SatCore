@@ -2,6 +2,7 @@ import streamlit as st
 from modules import health_dashboard
 from modules import telemetry_analyzer
 from modules import pass_scheduler
+from modules import orbit_visualizer
 
 
 st.title("SatCore")
@@ -32,7 +33,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-page = st.sidebar.radio("Navigation", ["Health Dashboard", "Telemetry Analyzer", "Pass Scheduler"])
+page = st.sidebar.radio("Navigation", ["Health Dashboard", "Telemetry Analyzer", "Pass Scheduler", "Orbit Visualizer"])
 
 if page == "Health Dashboard":
     health_dashboard.render()
@@ -40,3 +41,5 @@ elif page == "Telemetry Analyzer":
     telemetry_analyzer.render()
 elif page == "Pass Scheduler":
     pass_scheduler.render()
+elif page == "Orbit Visualizer":
+    orbit_visualizer.render()
