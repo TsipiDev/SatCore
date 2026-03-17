@@ -4,6 +4,8 @@ from skyfield.api import load, EarthSatellite, wgs84
 from datetime import datetime, timezone
 import pandas as pd
 import pytz
+import json
+import os
 
 
 def render():
@@ -42,22 +44,46 @@ def render():
     selected_tz = st.selectbox("Display Timezone", list(tz_options.keys()), index=14)
     local_tz = pytz.timezone(tz_options[selected_tz])
 
-    url = "https://celestrak.org/NORAD/elements/gp.php?CATNR=59141&FORMAT=TLE"
-    response = requests.get(url)
-    lines = response.text.strip().splitlines()
+    with open("data/ground_stations.json") as f:
+        ground_stations = json.load(f)
+
+    gs_names = [gs["name"] for gs in ground_stations]
+    selected_gs_name = st.selectbox("Ground Station", gs_names, index=0)
+    selected_gs = next(gs for gs in ground_stations if gs["name"] == selected_gs_name)
+    ground_station = wgs84.latlon(selected_gs["lat"], selected_gs["lon"])
+
+    if not os.path.exists("data/tle_data/active.tle"):
+        st.warning("TLE catalog not found. Please run fetch_tle_catalog.py first.")
+        return
+
+    with open("data/tle_data/active.tle") as f:
+        catalog_lines = f.read().strip().splitlines()
+
+    all_satellites = {}
+    clean_lines = [line for line in catalog_lines if line.strip() != ""]
+    for i in range(0, len(clean_lines) - 2, 3):
+        name = clean_lines[i].strip()
+        all_satellites[name] = clean_lines[i:i+3]
+
+    sat_names = list(all_satellites.keys())
+    selected_satellite = st.selectbox("Select Satellite", sat_names, index=sat_names.index("TIGER-7") if "TIGER-7" in sat_names else 0)
+    lines = all_satellites[selected_satellite]
 
     ts = load.timescale()
     satellite = EarthSatellite(lines[1], lines[2], lines[0], ts)
 
-    st.write(f"Tracking: {lines[0].strip()}")
-    st.write(f"Epoch: {satellite.epoch.utc_iso()}")
-
-    ground_station = wgs84.latlon(38.5731, 23.5880)
+    st.markdown("---")
+    st.write("Tracking Info")
+    st.metric("Satellite", lines[0].strip())
+    st.metric("Ground Station", selected_gs["name"])
+    st.metric("TLE Epoch", satellite.epoch.utc_iso().replace("T", " ").replace("Z", " UTC"))
+    st.markdown("---")
 
     t0 = ts.now()
     t1 = ts.tt_jd(t0.tt + 7)
 
-    t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=10.0)
+    t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=5.0)
+
 
     passes = []
     for ti, event in zip(t, events):
@@ -109,6 +135,10 @@ def render():
             "Recommended Action": action
         })
 
+    if len(pass_windows) == 0:
+        st.warning("No passes found for this satellite and ground station in the next 7 days.")
+        return
+
     next_pass = pass_windows[0]
     now = datetime.now(timezone.utc)
     next_aos = datetime.fromisoformat(passes[0]["time"].replace("Z", "+00:00"))
@@ -125,6 +155,5 @@ def render():
 
     st.markdown("---")
     st.write("Upcoming Passes")
-
     df_passes = pd.DataFrame(pass_windows)
     st.dataframe(df_passes, hide_index=True)
