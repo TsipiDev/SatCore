@@ -8,7 +8,9 @@ import pytz
 
 
 def render():
-    st.subheader("Orbit Visualizer")
+
+    st.markdown('<p class="page-title">Orbit Visualizer</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">REAL-TIME 3D ORBITAL TRACK & POSITION VISUALIZATION</p>', unsafe_allow_html=True)
 
     if not os.path.exists("data/tle_data/active.tle"):
         st.warning("TLE catalog not found. Please run fetch_tle_catalog.py first.")
@@ -56,6 +58,7 @@ def render():
         "UTC+14": "Etc/GMT-14"
     }
 
+    st.markdown('<div class="panel"><p class="panel-title">CONFIGURATION</p>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -72,19 +75,18 @@ def render():
         selected_tz = st.selectbox("Display Timezone", list(tz_options.keys()), index=14)
         local_tz = pytz.timezone(tz_options[selected_tz])
 
-    
+    st.markdown('</div>', unsafe_allow_html=True)
 
     ts = load.timescale()
     satellite = EarthSatellite(lines[1], lines[2], lines[0], ts)
     ground_station = wgs84.latlon(selected_gs["lat"], selected_gs["lon"])
 
-    st.markdown("---")
+    st.markdown('<div class="panel"><p class="panel-title">TRACKING INFO</p>', unsafe_allow_html=True)
     st.metric("Satellite", lines[0].strip())
     st.metric("Ground Station", selected_gs["name"])
     st.metric("TLE Epoch", satellite.epoch.utc_iso().replace("T", " ").replace("Z", " UTC"))
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # next pass info
     t0 = ts.now()
     t1 = ts.tt_jd(t0.tt + 7)
     t, events = satellite.find_events(ground_station, t0, t1, altitude_degrees=10.0)
@@ -108,46 +110,44 @@ def render():
         alt, _, _ = topo.altaz()
 
         rise_local = rise_time.astimezone(local_tz)
-
         now_utc = datetime.now(timezone.utc)
         time_until = rise_time - now_utc
         hours = int(time_until.total_seconds() // 3600)
         mins = int((time_until.total_seconds() % 3600) // 60)
 
-        st.write("Next Pass")
+        st.markdown('<div class="panel"><p class="panel-title">NEXT PASS</p>', unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("AOS", rise_local.strftime("%H:%M:%S"))
         c2.metric("Duration", f"{duration} mins")
         c3.metric("Max Elevation", f"{round(alt.degrees, 1)} deg")
         c4.metric("Time Until Pass", f"{hours}h {mins}m")
-        st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
+        st.markdown('<div class="panel"><p class="panel-title">NEXT PASS</p>', unsafe_allow_html=True)
         st.write("No upcoming passes found in the next 7 days.")
-        st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="panel"><p class="panel-title">ORBITAL TRACK</p>', unsafe_allow_html=True)
 
     refresh_options = {"10 seconds": 10, "30 seconds": 30, "60 seconds": 60}
     selected_refresh = st.select_slider("Auto Refresh", options=list(refresh_options.keys()), value="30 seconds")
     refresh_secs = refresh_options[selected_refresh]
-    
-    @st.fragment(run_every=refresh_secs)
 
+    @st.fragment(run_every=refresh_secs)
     def render_globe():
+        now_dt = datetime.now(timezone.utc)
         mean_motion = float(lines[2].split()[7])
         orbital_period = 1440 / mean_motion
-
         now = ts.now()
-        # 90 evenly spaced points over one full orbit starting from now
         step = orbital_period / 90
         times = ts.tt_jd([now.tt + (i * step / 1440) for i in range(91)])
 
         geocentric = satellite.at(times)
         subpoint = wgs84.subpoint_of(geocentric)
-
         lats = subpoint.latitude.degrees.tolist()
         lons = subpoint.longitude.degrees.tolist()
 
-        now = ts.now()
-        current = satellite.at(now)
+        current = satellite.at(ts.now())
         current_pos = wgs84.subpoint_of(current)
 
         fig = go.Figure()
@@ -186,22 +186,21 @@ def render():
             oceancolor="#0a0a1a",
             showcoastlines=True,
             coastlinecolor="#333366",
-            bgcolor="#0E1117"
+            bgcolor="#0E1117",
+            projection_rotation=dict(
+                lon=current_pos.longitude.degrees,
+                lat=current_pos.latitude.degrees
+            )
         )
 
         fig.update_layout(
             template="plotly_dark",
             height=600,
             margin=dict(t=0, b=0, l=0, r=0),
-            geo=dict(
-                bgcolor="#0E1117",
-                projection_rotation=dict(
-                    lon=current_pos.longitude.degrees,
-                    lat=current_pos.latitude.degrees
-                )
-            )
+            geo=dict(bgcolor="#0E1117")
         )
 
         st.plotly_chart(fig)
 
     render_globe()
+    st.markdown('</div>', unsafe_allow_html=True)
