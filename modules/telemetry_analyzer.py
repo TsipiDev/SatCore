@@ -6,7 +6,8 @@ import plotly.graph_objects as go
 
 def render():
 
-    st.subheader("Telemetry Analyzer")
+    st.markdown('<p class="page-title">Telemetry Analyzer</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">HISTORICAL TELEMETRY ANALYSIS & FORECASTING</p>', unsafe_allow_html=True)
 
     df = pd.read_csv("data/telemetry/sample_telemetry.csv")
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
@@ -81,30 +82,27 @@ def render():
         overall = "NOMINAL"
         overall_class = "nominal"
 
-    st.write("Spacecraft Overview")
+    st.markdown('<div class="panel"><p class="panel-title">SPACECRAFT OVERVIEW</p>', unsafe_allow_html=True)
     o1, o2, o3 = st.columns(3)
     o1.markdown(f'<p>Overall Health<br><span class="{overall_class}" style="font-size:1.8rem;">{overall}</span></p>', unsafe_allow_html=True)
     o2.metric("Anomaly Events", num_events)
     o3.metric("Observation Period", "7 days")
-
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     total = len(df)
     mode_counts = df["mode"].value_counts()
-
     nominal_pct = round((mode_counts.get("NOMINAL", 0) / total) * 100, 1)
     warning_pct = round((mode_counts.get("WARNING", 0) / total) * 100, 1)
     critical_pct = round((mode_counts.get("CRITICAL", 0) / total) * 100, 1)
 
-    st.write("Mission Health Summary")
+    st.markdown('<div class="panel"><p class="panel-title">MISSION HEALTH SUMMARY</p>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     c1.markdown(f'<p>Nominal<br><span class="info-nominal" style="font-size:1.8rem;">{nominal_pct}%</span></p>', unsafe_allow_html=True)
     c2.markdown(f'<p>Warning<br><span class="info-warning" style="font-size:1.8rem;">{warning_pct}%</span></p>', unsafe_allow_html=True)
     c3.markdown(f'<p>Critical<br><span class="info-critical" style="font-size:1.8rem;">{critical_pct}%</span></p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.write("Anomaly Events")
-
+    st.markdown('<div class="panel"><p class="panel-title">ANOMALY EVENTS</p>', unsafe_allow_html=True)
     if events_df is None:
         st.write("No anomalies detected.")
     else:
@@ -115,9 +113,7 @@ def render():
             severity_class = row['max_severity'].lower()
             c2.markdown(f'<p>Severity<br><span class="{severity_class}" style="font-size:1.8rem;">{row["max_severity"]}</span></p>', unsafe_allow_html=True)
             c3.metric("Readings affected", row['rows'])
-
             window = df[(df["timestamp"] >= row["start"]) & (df["timestamp"] <= row["end"])]
-
             causes = []
             if window["eps_batt_voltage_v"].min() < 6.8:
                 causes.append("low battery voltage")
@@ -129,20 +125,16 @@ def render():
                 causes.append("attitude error exceeded limit")
             if window["comms_rssi_dbm"].min() < -100:
                 causes.append("signal loss")
-
             if causes:
                 st.write(f"Possible cause: {', '.join(causes)}")
             else:
                 st.write("Cause could not be determined from available data.")
-
             st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.write("Parameter Trend Forecast")
-
+    st.markdown('<div class="panel"><p class="panel-title">PARAMETER TREND FORECAST</p>', unsafe_allow_html=True)
     df["timestamp_num"] = (df["timestamp"] - df["timestamp"].min()).dt.total_seconds()
     df_plot = df.sort_values("timestamp").set_index("timestamp").resample("6h").mean(numeric_only=True).reset_index()
-
     future_days = 30
     future_seconds = [df["timestamp_num"].max() + i * 86400 for i in range(future_days)]
     future_timestamps = [df["timestamp"].max() + pd.Timedelta(days=i) for i in range(future_days)]
@@ -246,3 +238,5 @@ def render():
     else:
         with st.expander("Attitude Error", expanded=True):
             st.markdown('<span class="info-unknown">Not Provided</span>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
